@@ -1,0 +1,655 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Dashboard Encerrados</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#f5f4f0;color:#1a1a18;padding:1.5rem;}
+.header{margin-bottom:1.5rem;display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px;}
+.header h1{font-size:20px;font-weight:500;}.header p{font-size:13px;color:#73726c;margin-top:3px;}
+.badge{font-size:11px;background:#E1F5EE;color:#085041;padding:4px 10px;border-radius:20px;}
+.badge.err{background:#FAECE7;color:#712B13;}
+.filters{background:#fff;border-radius:12px;border:0.5px solid rgba(0,0,0,.1);padding:1rem 1.25rem;margin-bottom:1.5rem;display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:12px;}
+@media(max-width:700px){.filters{grid-template-columns:1fr 1fr;}}
+.fg label{display:block;font-size:11px;color:#73726c;margin-bottom:4px;font-weight:500;letter-spacing:.04em;text-transform:uppercase;}
+.fg select{width:100%;padding:8px 10px;border-radius:8px;border:0.5px solid rgba(0,0,0,.2);background:#fff;font-size:13px;color:#1a1a18;cursor:pointer;}
+.stitle{font-size:11px;font-weight:500;color:#888780;letter-spacing:.06em;text-transform:uppercase;margin:0 0 10px;}
+.mgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:10px;}
+.metric{background:#ebebeb;border-radius:8px;padding:12px 14px;}
+.metric .val{font-size:26px;font-weight:500;color:#1a1a18;line-height:1;}
+.metric .lbl{font-size:11px;color:#73726c;margin-top:4px;}
+.metric .sub{font-size:11px;color:#888780;margin-top:2px;}
+.pgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:1.5rem;}
+.pc{background:#fff;border:0.5px solid rgba(0,0,0,.1);border-radius:8px;padding:10px 14px;display:flex;align-items:center;gap:10px;}
+.pc .ico{width:28px;height:28px;border-radius:6px;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.pc .pv{font-size:20px;font-weight:500;color:#1a1a18;line-height:1;}
+.pc .pl{font-size:11px;color:#73726c;display:block;}
+.pc .ps{font-size:11px;color:#888780;display:block;margin-top:2px;}
+.card{background:#fff;border:0.5px solid rgba(0,0,0,.1);border-radius:12px;padding:1rem 1.25rem;margin-bottom:1rem;}
+.ctitle{font-size:13px;font-weight:500;color:#73726c;margin:0 0 .75rem;}
+.brow{display:flex;align-items:center;gap:8px;margin-bottom:6px;}
+.blbl{font-size:12px;color:#1a1a18;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex-shrink:0;}
+.btrack{flex:1;background:#f1efe8;border-radius:3px;height:7px;}
+.bfill{height:100%;border-radius:3px;}
+.bval{width:60px;text-align:right;font-size:12px;color:#73726c;flex-shrink:0;}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:1rem;}
+@media(max-width:600px){.two{grid-template-columns:1fr;}}
+.tabs{display:flex;gap:4px;margin-bottom:1rem;}
+.tab{font-size:12px;padding:5px 14px;border-radius:8px;border:0.5px solid rgba(0,0,0,.2);background:transparent;color:#73726c;cursor:pointer;}
+.tab.on{background:#f1efe8;color:#1a1a18;font-weight:500;}
+.loading{text-align:center;padding:3rem;color:#73726c;font-size:14px;}
+.analise-badge{font-size:12px;font-weight:500;padding:4px 12px;border-radius:20px;white-space:nowrap;}
+.badge-ok{background:#E1F5EE;color:#085041;}
+.badge-low{background:#FAEEDA;color:#633806;}
+.badge-high{background:#FAECE7;color:#712B13;}
+
+/* Cards especiais de ticket medio */
+.tm-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;margin-bottom:1rem;}
+.tm-card{background:#fff;border:0.5px solid rgba(0,0,0,.1);border-radius:12px;padding:14px 16px;}
+.tm-card .tm-lbl{font-size:11px;color:#73726c;letter-spacing:.04em;text-transform:uppercase;font-weight:500;}
+.tm-card .tm-val{font-size:24px;font-weight:500;color:#1a1a18;margin-top:6px;line-height:1.1;}
+.tm-card .tm-sub{font-size:11px;color:#888780;margin-top:4px;}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div>
+    <h1>Dashboard de Encerrados</h1>
+    <p id="subtitulo">Carregando dados...</p>
+  </div>
+  <span class="badge" id="badge">&#9679; Odoo XML-RPC</span>
+</div>
+
+<div id="loading" class="loading">Carregando dados_encerrados.json...</div>
+<div id="app" style="display:none;">
+
+<div class="filters">
+  <div class="fg"><label>Grupo</label><select id="fGrupo" onchange="onGrupo()"><option value="">Todos os grupos</option></select></div>
+  <div class="fg"><label>Projeto</label><select id="fProjeto" onchange="onProjeto()"><option value="">Todos os projetos</option></select></div>
+  <div class="fg"><label>Carteira de metas</label><select id="fCarteira" onchange="render()"><option value="">Todas as carteiras</option></select></div>
+  <div class="fg"><label>Mes de encerramento</label><select id="fMes" onchange="render()"><option value="">Todos os meses</option></select></div>
+</div>
+
+<p class="stitle">Resumo</p>
+<div class="mgrid">
+  <div class="metric"><div class="val" id="mTot">-</div><div class="lbl">total de encerrados</div><div class="sub" id="mTotSub"></div></div>
+</div>
+<div class="mgrid" style="margin-bottom:1.5rem;">
+  <div class="metric" style="background:#E6F1FB;"><div class="val" id="cHoje" style="font-size:22px;">-</div><div class="lbl" style="color:#185FA5;font-weight:500;">encerrados hoje</div><div class="sub" id="cHojeSub"></div></div>
+  <div class="metric" style="background:#E1F5EE;"><div class="val" id="cSemana" style="font-size:22px;">-</div><div class="lbl" style="color:#0F6E56;font-weight:500;">semana atual</div><div class="sub" id="cSemanaSub"></div></div>
+  <div class="metric" style="background:#FAEEDA;"><div class="val" id="cMesAtual" style="font-size:22px;">-</div><div class="lbl" style="color:#854F0B;font-weight:500;">mes atual</div><div class="sub" id="cMesAtualSub"></div></div>
+</div>
+<div class="pgrid">
+  <div class="pc"><div class="ico" style="background:#E6F1FB;"><svg width="14" height="14" viewBox="0 0 16 16" fill="none"><rect x="2" y="3" width="12" height="11" rx="2" stroke="#185FA5" stroke-width="1.2"/><path d="M5 1v3M11 1v3M2 7h12" stroke="#185FA5" stroke-width="1.2" stroke-linecap="round"/></svg></div><div><div class="pv" id="pDia">-</div><span class="pl">por dia</span><span class="ps" id="pDiaSub"></span></div></div>
+  <div class="pc"><div class="ico" style="background:#E1F5EE;"><svg width="14" height="14" viewBox="0 0 16 16" fill="none"><rect x="2" y="3" width="12" height="11" rx="2" stroke="#0F6E56" stroke-width="1.2"/><path d="M5 1v3M11 1v3M2 7h12" stroke="#0F6E56" stroke-width="1.2" stroke-linecap="round"/></svg></div><div><div class="pv" id="pSem">-</div><span class="pl">por semana</span><span class="ps" id="pSemSub"></span></div></div>
+  <div class="pc"><div class="ico" style="background:#FAEEDA;"><svg width="14" height="14" viewBox="0 0 16 16" fill="none"><rect x="2" y="3" width="12" height="11" rx="2" stroke="#854F0B" stroke-width="1.2"/><path d="M5 1v3M11 1v3M2 7h12" stroke="#854F0B" stroke-width="1.2" stroke-linecap="round"/><circle cx="8" cy="11" r="1.5" fill="#854F0B"/></svg></div><div><div class="pv" id="pMes">-</div><span class="pl">por mes</span><span class="ps" id="pMesSub"></span></div></div>
+  <div class="pc"><div class="ico" style="background:#EEEDFE;"><svg width="14" height="14" viewBox="0 0 16 16" fill="none"><rect x="2" y="3" width="12" height="11" rx="2" stroke="#534AB7" stroke-width="1.2"/><path d="M5 1v3M11 1v3M2 7h12" stroke="#534AB7" stroke-width="1.2" stroke-linecap="round"/></svg></div><div><div class="pv" id="pAno">-</div><span class="pl">por ano</span><span class="ps" id="pAnoSub"></span></div></div>
+</div>
+
+<!-- ────────────  5) GRAFICO POR DIA  ──────────── -->
+<div class="card" style="margin-bottom:1rem;">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.75rem;flex-wrap:wrap;gap:8px;">
+    <p class="ctitle" style="margin:0;">Encerrados por dia &mdash; mes vigente</p>
+    <span style="font-size:11px;color:#888780;" id="grafMesLabel"></span>
+  </div>
+  <div style="position:relative;width:100%;height:180px;">
+    <canvas id="cDiaMes" role="img" aria-label="Grafico de encerrados por dia no mes vigente">Casos encerrados por dia no mes atual.</canvas>
+  </div>
+</div>
+
+<!-- ────────────  6) ANALISE POR MES  ──────────── -->
+<div class="card" style="margin-bottom:1rem;">
+  <p class="ctitle">Analise de encerramentos por mes</p>
+  <div id="anLinhas"></div>
+</div>
+
+<!-- ────────────  7) MOTIVO DE ENCERRAMENTO  ──────────── -->
+<p class="stitle">Motivos de encerramento</p>
+<div class="card">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.75rem;flex-wrap:wrap;gap:8px;">
+    <p class="ctitle" style="margin:0;">Distribuicao por motivo_encerramento_id</p>
+    <span style="font-size:11px;color:#888780;" id="motivoLabel"></span>
+  </div>
+  <div style="position:relative;width:100%;height:240px;">
+    <canvas id="cMotivo" role="img" aria-label="Grafico de encerrados por motivo">Encerrados por motivo de encerramento.</canvas>
+  </div>
+</div>
+
+<!-- ────────────  8) MOTIVOS DETALHADOS  ──────────── -->
+<div class="card">
+  <p class="ctitle">Motivos detalhados (com quantidade e valor)</p>
+  <div id="bMotivo"></div>
+</div>
+
+<!-- ────────────  9) TICKET MEDIO  ──────────── -->
+<p class="stitle">Ticket medio (valor_encerramento_cliente)</p>
+<div class="tm-grid">
+  <div class="tm-card" style="background:#E1F5EE;">
+    <div class="tm-lbl" style="color:#0F6E56;">Ticket medio geral</div>
+    <div class="tm-val" id="tmGeral">-</div>
+    <div class="tm-sub" id="tmGeralSub">no periodo filtrado</div>
+  </div>
+  <div class="tm-card" style="background:#E6F1FB;">
+    <div class="tm-lbl" style="color:#185FA5;">Valor total encerrado</div>
+    <div class="tm-val" id="tmTotal">-</div>
+    <div class="tm-sub" id="tmTotalSub">soma dos valores</div>
+  </div>
+  <div class="tm-card" style="background:#FAEEDA;">
+    <div class="tm-lbl" style="color:#854F0B;">Ticket medio mes atual</div>
+    <div class="tm-val" id="tmMes">-</div>
+    <div class="tm-sub" id="tmMesSub"></div>
+  </div>
+  <div class="tm-card" style="background:#EEEDFE;">
+    <div class="tm-lbl" style="color:#534AB7;">% com valor informado</div>
+    <div class="tm-val" id="tmPctVal">-</div>
+    <div class="tm-sub" id="tmPctValSub"></div>
+  </div>
+</div>
+
+<!-- ────────────  10) TICKET MEDIO POR PROJETO  ──────────── -->
+<div class="card">
+  <p class="ctitle">Ticket medio por projeto</p>
+  <div id="bTicketProj"></div>
+</div>
+
+<div class="two">
+  <div class="card"><p class="ctitle">Encerrados por projeto</p><div id="bProjeto"></div></div>
+  <div class="card"><p class="ctitle">Top UFs</p><div id="bUF"></div></div>
+</div>
+
+<p class="stitle">Objetos</p>
+<div class="card">
+  <p class="ctitle">Objetos mais frequentes</p>
+  <div class="tabs">
+    <button class="tab on" onclick="setObjTab(10,this)">Top 10</button>
+    <button class="tab" onclick="setObjTab(20,this)">Top 20</button>
+    <button class="tab" onclick="setObjTab(9999,this)">Todos</button>
+  </div>
+  <div id="bObj"></div>
+</div>
+
+</div><!-- #app -->
+
+<script>
+var ROWS=[], HIER={}, objTop=10;
+var GCOL={Santander:"#378ADD",Gol:"#1D9E75",Bradesco:"#EF9F27",Cielo:"#D85A30",Mercantil:"#7F77DD"};
+var MES_NOMES={"2026-01":"Janeiro/2026","2026-02":"Fevereiro/2026","2026-03":"Marco/2026","2026-04":"Abril/2026","2026-05":"Maio/2026","2026-06":"Junho/2026","2026-07":"Julho/2026","2026-08":"Agosto/2026","2026-09":"Setembro/2026","2026-10":"Outubro/2026","2026-11":"Novembro/2026","2026-12":"Dezembro/2026"};
+
+// ── Carrega dados_encerrados.json ─────────────────────────────
+fetch("dados_encerrados.json")
+  .then(function(r){ if(!r.ok) throw new Error("dados_encerrados.json nao encontrado"); return r.json(); })
+  .then(function(data){
+    ROWS = data.rows;
+    HIER = data.hier;
+    document.getElementById("subtitulo").textContent = "Fonte: Odoo XML-RPC \u00b7 Gerado em " + data.gerado_em;
+    document.getElementById("badge").textContent = "\u2713 Odoo conectado";
+    document.getElementById("loading").style.display = "none";
+    document.getElementById("app").style.display = "";
+    initFiltros();
+    render();
+  })
+  .catch(function(err){
+    document.getElementById("loading").textContent = "Erro ao carregar dados_encerrados.json: " + err.message;
+    document.getElementById("badge").textContent = "Erro ao carregar";
+    document.getElementById("badge").className = "badge err";
+  });
+
+// ── Utilitários ───────────────────────────────────────────────
+function fmt(n){ return Math.round(n).toLocaleString("pt-BR"); }
+function fmtBRL(n){
+  if(!isFinite(n)) n = 0;
+  return n.toLocaleString("pt-BR",{style:"currency",currency:"BRL",minimumFractionDigits:2,maximumFractionDigits:2});
+}
+function fmtBRLcompact(n){
+  if(!isFinite(n)) n = 0;
+  var abs = Math.abs(n);
+  if(abs >= 1e9) return "R$ "+(n/1e9).toFixed(2)+" bi";
+  if(abs >= 1e6) return "R$ "+(n/1e6).toFixed(2)+" mi";
+  if(abs >= 1e3) return "R$ "+(n/1e3).toFixed(1)+" mil";
+  return fmtBRL(n);
+}
+function pct(n,t){ return t ? (n/t*100).toFixed(1)+"%" : "0%"; }
+function pad(n){ return String(n).padStart(2,"0"); }
+
+function count(rows,idx){
+  var m={};
+  rows.forEach(function(r){ var k=r[idx]||"N/A"; m[k]=(m[k]||0)+1; });
+  return m;
+}
+
+// soma valor (col 13) agrupando por coluna idx
+function sumByCol(rows,idx){
+  var m={};
+  rows.forEach(function(r){
+    var k = r[idx] || "N/A";
+    var v = parseFloat(r[13]) || 0;
+    if(!m[k]) m[k] = {qtd:0, soma:0};
+    m[k].qtd  += 1;
+    m[k].soma += v;
+  });
+  return m;
+}
+
+function bars(el,entries,colorFn,lblW){
+  var max = entries.length ? entries[0][1] : 1;
+  el.innerHTML = entries.map(function(e){
+    var l=e[0], v=e[1], w=Math.round(v/max*100);
+    return "<div class='brow'><span class='blbl' style='width:"+(lblW||180)+"px' title='"+l+"'>"+l+"</span>"
+         + "<div class='btrack'><div class='bfill' style='width:"+w+"%;background:"+colorFn(l)+"'></div></div>"
+         + "<span class='bval'>"+fmt(v)+"</span></div>";
+  }).join("");
+}
+
+// barras com valor monetário no lugar do fmt(v)
+function barsMoney(el,entries,colorFn,lblW){
+  var max = entries.length ? entries[0][1] : 1;
+  el.innerHTML = entries.map(function(e){
+    var l=e[0], v=e[1], w=Math.round(v/max*100);
+    return "<div class='brow'><span class='blbl' style='width:"+(lblW||180)+"px' title='"+l+"'>"+l+"</span>"
+         + "<div class='btrack'><div class='bfill' style='width:"+w+"%;background:"+colorFn(l)+"'></div></div>"
+         + "<span class='bval' style='width:90px;'>"+fmtBRLcompact(v)+"</span></div>";
+  }).join("");
+}
+
+// ── Filtros em cascata ────────────────────────────────────────
+function getRows(){
+  var g=document.getElementById("fGrupo").value;
+  var p=document.getElementById("fProjeto").value;
+  var c=document.getElementById("fCarteira").value;
+  var m=document.getElementById("fMes").value;
+  return ROWS.filter(function(r){
+    return (!g||r[0]===g)&&(!p||r[1]===p)&&(!c||r[2]===c)&&(!m||r[10]===m);
+  });
+}
+
+function mergeHier(){
+  var out={};
+  Object.values(HIER).forEach(function(h){ Object.keys(h).forEach(function(k){ out[k]=h[k]; }); });
+  return out;
+}
+
+function onGrupo(){
+  var g=document.getElementById("fGrupo").value;
+  var ps=document.getElementById("fProjeto");
+  var cs=document.getElementById("fCarteira");
+  ps.innerHTML="<option value=''>Todos os projetos</option>";
+  cs.innerHTML="<option value=''>Todas as carteiras</option>";
+  var src=g&&HIER[g]?HIER[g]:mergeHier();
+  Object.keys(src).sort().forEach(function(p){ ps.innerHTML+="<option value='"+p+"'>"+p+"</option>"; });
+  var allC=new Set();
+  Object.values(src).forEach(function(arr){ arr.forEach(function(c){ allC.add(c); }); });
+  Array.from(allC).sort().forEach(function(c){ cs.innerHTML+="<option value='"+c+"'>"+c+"</option>"; });
+  render();
+}
+
+function onProjeto(){
+  var g=document.getElementById("fGrupo").value;
+  var p=document.getElementById("fProjeto").value;
+  var cs=document.getElementById("fCarteira");
+  cs.innerHTML="<option value=''>Todas as carteiras</option>";
+  var carts=new Set();
+  if(p){ Object.values(HIER).forEach(function(h){ if(h[p]) h[p].forEach(function(c){ carts.add(c); }); }); }
+  else { var src=g&&HIER[g]?HIER[g]:mergeHier(); Object.values(src).forEach(function(arr){ arr.forEach(function(c){ carts.add(c); }); }); }
+  Array.from(carts).sort().forEach(function(c){ cs.innerHTML+="<option value='"+c+"'>"+c+"</option>"; });
+  render();
+}
+
+function setObjTab(n,btn){
+  objTop=n;
+  document.querySelectorAll(".tabs .tab").forEach(function(t){ t.className="tab"; });
+  btn.className="tab on";
+  render();
+}
+
+function initFiltros(){
+  var gs=document.getElementById("fGrupo");
+  Array.from(new Set(ROWS.map(function(r){return r[0];}))).filter(function(g){return g&&g!=="N/A";}).sort()
+    .forEach(function(g){ gs.innerHTML+="<option value='"+g+"'>"+g+"</option>"; });
+  var ps=document.getElementById("fProjeto");
+  Array.from(new Set(ROWS.map(function(r){return r[1];}))).filter(function(p){return p&&p!=="N/A";}).sort()
+    .forEach(function(p){ ps.innerHTML+="<option value='"+p+"'>"+p+"</option>"; });
+  var cs=document.getElementById("fCarteira");
+  Array.from(new Set(ROWS.map(function(r){return r[2];}))).sort()
+    .forEach(function(c){ cs.innerHTML+="<option value='"+c+"'>"+c+"</option>"; });
+  var ms=document.getElementById("fMes");
+  Array.from(new Set(ROWS.map(function(r){return r[10];}))).filter(function(k){return k;}).sort()
+    .forEach(function(m){ ms.innerHTML+="<option value='"+m+"'>"+(MES_NOMES[m]||m)+"</option>"; });
+}
+
+// ── Render principal ──────────────────────────────────────────
+function render(){
+  var rows=getRows(), total=rows.length;
+
+  document.getElementById("mTot").textContent=fmt(total);
+  document.getElementById("mTotSub").textContent="encerrados no periodo";
+
+  // Médias por período
+  var diasMap=count(rows,8), semsMap=count(rows,9), mesMap=count(rows,10), anoMap=count(rows,11);
+  var nD=Object.keys(diasMap).filter(function(k){return k;}).length||1;
+  var nS=Object.keys(semsMap).filter(function(k){return k;}).length||1;
+  var nM=Object.keys(mesMap).filter(function(k){return k;}).length||1;
+  var nA=Object.keys(anoMap).filter(function(k){return k;}).length||1;
+  document.getElementById("pDia").textContent=fmt(Math.round(total/nD));
+  document.getElementById("pDiaSub").textContent=nD+" dias";
+  document.getElementById("pSem").textContent=fmt(Math.round(total/nS));
+  document.getElementById("pSemSub").textContent=nS+" semanas";
+  document.getElementById("pMes").textContent=fmt(Math.round(total/nM));
+  document.getElementById("pMesSub").textContent=nM+" "+(nM===1?"mes":"meses");
+  document.getElementById("pAno").textContent=fmt(Math.round(total/nA));
+  document.getElementById("pAnoSub").textContent="media anual";
+
+  // Hoje / semana atual / mes atual
+  var today=new Date();
+  var todayStr=today.getFullYear()+"-"+pad(today.getMonth()+1)+"-"+pad(today.getDate());
+  var thisMonth=today.getFullYear()+"-"+pad(today.getMonth()+1);
+  function isoWeek(dstr){ var d=new Date(dstr); var j=new Date(d.getFullYear(),0,1); var w=Math.ceil(((d-j)/86400000+j.getDay()+1)/7); return d.getFullYear()+"-W"+pad(w); }
+  var todayWk=isoWeek(todayStr);
+  var cH=0,cS=0,cM=0;
+  rows.forEach(function(r){ if(r[8]===todayStr)cH++; if(r[9]===todayWk)cS++; if(r[10]===thisMonth)cM++; });
+  var ulDia=Object.keys(diasMap).filter(function(k){return k;}).sort().slice(-1)[0]||"";
+  var ulSem=Object.keys(semsMap).filter(function(k){return k;}).sort().slice(-1)[0]||"";
+  var ulMes=Object.keys(mesMap).filter(function(k){return k;}).sort().slice(-1)[0]||"";
+  if(!cH&&ulDia) cH=diasMap[ulDia]||0;
+  if(!cS&&ulSem) cS=semsMap[ulSem]||0;
+  if(!cM&&ulMes) cM=mesMap[ulMes]||0;
+  document.getElementById("cHoje").textContent=fmt(cH);
+  document.getElementById("cHojeSub").textContent=diasMap[todayStr]?"hoje":"ultimo: "+ulDia;
+  document.getElementById("cSemana").textContent=fmt(cS);
+  document.getElementById("cSemanaSub").textContent=semsMap[todayWk]?"semana atual":"ultima: "+ulSem;
+  document.getElementById("cMesAtual").textContent=fmt(cM);
+  document.getElementById("cMesAtualSub").textContent=mesMap[thisMonth]?"mes atual":"ultimo: "+ulMes;
+
+  // ───────────── TICKET MEDIO ─────────────
+  (function(){
+    var somaGeral=0, comValor=0, somaMes=0, qtdMes=0;
+    rows.forEach(function(r){
+      var v = parseFloat(r[13]) || 0;
+      somaGeral += v;
+      if(v > 0) comValor++;
+      if(r[10] === thisMonth){
+        somaMes += v;
+        qtdMes++;
+      }
+    });
+
+    // Ticket medio geral = soma / quantidade COM valor informado (>0)
+    var tmGeral = comValor > 0 ? somaGeral / comValor : 0;
+    var tmMes   = qtdMes   > 0 ? somaMes   / qtdMes   : 0;
+    var pctVal  = total > 0 ? (comValor/total*100) : 0;
+
+    document.getElementById("tmGeral").textContent = fmtBRL(tmGeral);
+    document.getElementById("tmGeralSub").textContent = comValor>0
+      ? "base: "+fmt(comValor)+" encerrados com valor"
+      : "nenhum encerrado com valor";
+
+    document.getElementById("tmTotal").textContent = fmtBRLcompact(somaGeral);
+    document.getElementById("tmTotalSub").textContent = "soma de "+fmt(total)+" encerrados";
+
+    document.getElementById("tmMes").textContent = fmtBRL(tmMes);
+    document.getElementById("tmMesSub").textContent = qtdMes>0
+      ? fmt(qtdMes)+" encerrados em "+(MES_NOMES[thisMonth]||thisMonth)
+      : "sem encerrados no mes atual";
+
+    document.getElementById("tmPctVal").textContent = pctVal.toFixed(1)+"%";
+    document.getElementById("tmPctValSub").textContent = fmt(comValor)+" de "+fmt(total)+" tem valor > 0";
+
+    // Ticket medio por projeto (top 15)
+    var porProj = sumByCol(rows, 1);
+    var arrProj = Object.keys(porProj).map(function(k){
+      var qtd = porProj[k].qtd;
+      var soma= porProj[k].soma;
+      return [k, qtd>0 ? soma/qtd : 0, qtd, soma];
+    }).filter(function(e){ return e[0] !== "N/A"; })
+      .sort(function(a,b){ return b[1]-a[1]; })
+      .slice(0,15);
+
+    var elTP = document.getElementById("bTicketProj");
+    var maxTm = arrProj.length ? arrProj[0][1] : 1;
+    elTP.innerHTML = arrProj.map(function(e){
+      var lbl=e[0], tm=e[1], qtd=e[2], soma=e[3];
+      var w = Math.round(tm/maxTm*100);
+      return "<div class='brow'>"
+        +"<span class='blbl' style='width:200px' title='"+lbl+"'>"+lbl+"</span>"
+        +"<div class='btrack'><div class='bfill' style='width:"+w+"%;background:#1D9E75'></div></div>"
+        +"<span class='bval' style='width:120px;'>"+fmtBRLcompact(tm)+"</span>"
+        +"<span class='bval' style='width:60px;color:#888780;'>"+fmt(qtd)+"</span>"
+        +"</div>";
+    }).join("") || "<div style='font-size:12px;color:#888780;padding:10px 0;'>Sem dados.</div>";
+  })();
+
+  // ───────────── MOTIVO DE ENCERRAMENTO ─────────────
+  (function(){
+    var porMotivo = sumByCol(rows, 12);
+    var arr = Object.keys(porMotivo).map(function(k){
+      return [k, porMotivo[k].qtd, porMotivo[k].soma];
+    }).sort(function(a,b){ return b[1]-a[1]; });
+
+    document.getElementById("motivoLabel").textContent = arr.length+" motivo(s) distinto(s)";
+
+    // Grafico de barras (Chart.js) - top 12 motivos
+    var top = arr.slice(0,12);
+    var labels = top.map(function(e){ return e[0].length>30 ? e[0].slice(0,28)+"..." : e[0]; });
+    var fullLabels = top.map(function(e){ return e[0]; });
+    var dataQ = top.map(function(e){ return e[1]; });
+
+    if(window._motivoChart) window._motivoChart.destroy();
+    window._motivoChart = new Chart(document.getElementById("cMotivo"),{
+      type:"bar",
+      data:{
+        labels: labels,
+        datasets:[{
+          data: dataQ,
+          backgroundColor: "#D85A30",
+          borderRadius: 3,
+          borderSkipped: false
+        }]
+      },
+      options:{
+        responsive:true,
+        maintainAspectRatio:false,
+        indexAxis:"y",
+        plugins:{
+          legend:{display:false},
+          tooltip:{callbacks:{
+            title:function(ctx){ return fullLabels[ctx[0].dataIndex]; },
+            label:function(ctx){
+              var i = ctx.dataIndex;
+              var v = top[i][2];
+              var pctMot = total>0 ? (top[i][1]/total*100).toFixed(1)+"%" : "0%";
+              return [" "+fmt(top[i][1])+" encerrados ("+pctMot+")", " "+fmtBRLcompact(v)+" em valor"];
+            }
+          }}
+        },
+        scales:{
+          x:{beginAtZero:true,grid:{color:"rgba(0,0,0,0.05)"},ticks:{font:{size:11}}},
+          y:{grid:{display:false},ticks:{font:{size:11}}}
+        }
+      }
+    });
+
+    // Lista detalhada - qtd e valor lado a lado
+    var elM = document.getElementById("bMotivo");
+    var maxQ = arr.length ? arr[0][1] : 1;
+    elM.innerHTML = arr.map(function(e){
+      var lbl=e[0], qtd=e[1], soma=e[2];
+      var pctMot = total>0 ? (qtd/total*100).toFixed(1)+"%" : "0%";
+      var w = Math.round(qtd/maxQ*100);
+      var tm = qtd>0 ? soma/qtd : 0;
+      return "<div class='brow'>"
+        +"<span class='blbl' style='width:220px' title='"+lbl+"'>"+lbl+"</span>"
+        +"<div class='btrack'><div class='bfill' style='width:"+w+"%;background:#D85A30'></div></div>"
+        +"<span class='bval' style='width:60px;'>"+fmt(qtd)+"</span>"
+        +"<span class='bval' style='width:60px;color:#888780;'>"+pctMot+"</span>"
+        +"<span class='bval' style='width:110px;color:#0F6E56;'>"+fmtBRLcompact(soma)+"</span>"
+        +"<span class='bval' style='width:110px;color:#888780;' title='ticket medio'>"+fmtBRLcompact(tm)+"</span>"
+        +"</div>";
+    }).join("") || "<div style='font-size:12px;color:#888780;padding:10px 0;'>Sem dados.</div>";
+  })();
+
+  // ───────────── Grafico encerrados por dia do mes vigente ─────────────
+  (function(){
+    var todayLocal = new Date();
+    var mesAtual = todayLocal.getFullYear()+"-"+pad(todayLocal.getMonth()+1);
+    var MN = MES_NOMES;
+
+    var todosMeses = Object.keys(mesMap).filter(function(k){return k;}).sort();
+    var mesRef = mesMap[mesAtual] ? mesAtual : (todosMeses[todosMeses.length-1]||mesAtual);
+
+    var diasMes = {};
+    rows.forEach(function(r){ if(r[10]===mesRef && r[8]) diasMes[r[8]]=(diasMes[r[8]]||0)+1; });
+    var labels = Object.keys(diasMes).sort();
+    var data = labels.map(function(d){ return diasMes[d]; });
+
+    var labelsFormatados = labels.map(function(d){
+      return d.slice(8)+"/"+d.slice(5,7)+"/"+d.slice(2,4);
+    });
+
+    document.getElementById("grafMesLabel").textContent = MN[mesRef]||mesRef;
+
+    if(window._diaMesChart) window._diaMesChart.destroy();
+    window._diaMesChart = new Chart(document.getElementById("cDiaMes"),{
+      type:"bar",
+      data:{
+        labels: labelsFormatados,
+        datasets:[{
+          data: data,
+          backgroundColor: data.map(function(v,i){
+            return i===data.length-1?"#0F6E56":"#1D9E75";
+          }),
+          borderRadius: 3,
+          borderSkipped: false
+        }]
+      },
+      options:{
+        responsive:true,
+        maintainAspectRatio:false,
+        plugins:{
+          legend:{display:false},
+          tooltip:{callbacks:{
+            title:function(ctx){ return labelsFormatados[ctx[0].dataIndex]; },
+            label:function(ctx){ return " "+fmt(ctx.raw)+" encerrados"; }
+          }}
+        },
+        layout:{padding:{top:20}},
+        scales:{
+          x:{grid:{display:false},ticks:{font:{size:10},autoSkip:false,maxRotation:45}},
+          y:{beginAtZero:true,grid:{color:"rgba(0,0,0,0.05)"},ticks:{font:{size:11}}}
+        },
+        animation:{
+          onComplete:function(e){
+            var chart=e.chart;
+            var meta=chart.getDatasetMeta(0);
+            var c=chart.ctx;
+            c.save();
+            c.font="500 11px -apple-system,sans-serif";
+            c.textAlign="center";
+            c.textBaseline="bottom";
+            meta.data.forEach(function(bar,i){
+              if(!data[i]) return;
+              c.fillStyle=i===data.length-1?"#085041":"#0F6E56";
+              c.fillText(fmt(data[i]),bar.x,bar.y-3);
+            });
+            c.restore();
+          }
+        }
+      }
+    });
+  })();
+
+  // ───────────── Analise comparativa ─────────────
+  (function(){
+    var todayLocal = new Date();
+    var mesAtual = todayLocal.getFullYear()+"-"+pad(todayLocal.getMonth()+1);
+    var MN = {"2026-01":"Jan/26","2026-02":"Fev/26","2026-03":"Mar/26","2026-04":"Abr/26","2026-05":"Mai/26","2026-06":"Jun/26","2026-07":"Jul/26","2026-08":"Ago/26","2026-09":"Set/26","2026-10":"Out/26","2026-11":"Nov/26","2026-12":"Dez/26"};
+
+    var todosMeses = Object.keys(mesMap).filter(function(k){return k;}).sort();
+    if(todosMeses.length === 0) return;
+
+    var mesesAnt = todosMeses.filter(function(m){ return m < mesAtual; });
+    var temMesAtual = !!mesMap[mesAtual];
+
+    function diasDoMes(ym){
+      return Object.keys(diasMap).filter(function(d){ return d && d.slice(0,7)===ym; }).length || 1;
+    }
+
+    var linhas = [];
+    if(temMesAtual && mesesAnt.length > 0){
+      var qtdAtual = mesMap[mesAtual];
+      var diasAtual = diasDoMes(mesAtual);
+      var ritmoAtual = qtdAtual / diasAtual;
+      var mediaRitmoDia = mesesAnt.reduce(function(acc,m){
+        return acc + (mesMap[m]||0) / diasDoMes(m);
+      }, 0) / mesesAnt.length;
+
+      var diffD = mediaRitmoDia > 0 ? ((ritmoAtual - mediaRitmoDia) / mediaRitmoDia * 100) : 0;
+      var badgeD = diffD >= -10 && diffD <= 15 ? "badge-ok" : diffD < -10 ? "badge-low" : "badge-high";
+      var labelD = diffD >= -10 && diffD <= 15 ? "dentro da media" : diffD < -10 ? "abaixo da media" : "acima da media";
+      var sinalD = (diffD>=0?"+":"")+diffD.toFixed(1)+"%";
+      var barD = mediaRitmoDia > 0 ? Math.min(Math.round(ritmoAtual/mediaRitmoDia*100),140) : 0;
+      var corD = badgeD==="badge-ok"?"#1D9E75":badgeD==="badge-low"?"#EF9F27":"#D85A30";
+
+      linhas.push({
+        titulo: MN[mesAtual]||mesAtual,
+        subtitulo: "mes vigente \u00b7 ritmo: "+fmt(Math.round(ritmoAtual))+" enc/dia \u00b7 media historica: "+fmt(Math.round(mediaRitmoDia))+"/dia",
+        val: fmt(qtdAtual),
+        badge: labelD+" ("+sinalD+")",
+        badgeClass: badgeD,
+        barW: barD,
+        barColor: corD
+      });
+    }
+
+    if(mesesAnt.length > 0){
+      var mediaGeral = mesesAnt.reduce(function(acc,m){ return acc+(mesMap[m]||0); },0) / mesesAnt.length;
+      mesesAnt.forEach(function(m){
+        var qtd = mesMap[m] || 0;
+        var diff = mediaGeral > 0 ? ((qtd - mediaGeral) / mediaGeral * 100) : 0;
+        var badge = diff >= -10 && diff <= 15 ? "badge-ok" : diff < -10 ? "badge-low" : "badge-high";
+        var label = diff >= -10 && diff <= 15 ? "dentro da media" : diff < -10 ? "abaixo da media" : "acima da media";
+        var sinal = (diff>=0?"+":"")+diff.toFixed(1)+"%";
+        var barW = mediaGeral > 0 ? Math.min(Math.round(qtd/mediaGeral*100),140) : 0;
+        var cor = badge==="badge-ok"?"#1D9E75":badge==="badge-low"?"#EF9F27":"#D85A30";
+        linhas.push({
+          titulo: MN[m]||m,
+          subtitulo: "mes completo \u00b7 media geral: "+fmt(Math.round(mediaGeral))+" enc/mes",
+          val: fmt(qtd),
+          badge: label+" ("+sinal+")",
+          badgeClass: badge,
+          barW: barW,
+          barColor: cor
+        });
+      });
+    }
+
+    var el = document.getElementById("anLinhas");
+    if(!el) return;
+    el.innerHTML = linhas.map(function(l){
+      return "<div style='display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;padding:10px 0;border-bottom:0.5px solid rgba(0,0,0,.06);'>"
+        +"<div style='min-width:160px;flex:1;'>"
+        +"<div style='font-size:13px;font-weight:500;color:#1a1a18;'>"+l.titulo+"</div>"
+        +"<div style='font-size:11px;color:#888780;margin-top:2px;'>"+l.subtitulo+"</div>"
+        +"<div style='height:5px;background:#f1efe8;border-radius:3px;margin-top:6px;overflow:hidden;'>"
+        +"<div style='height:100%;width:"+l.barW+"%;background:"+l.barColor+";border-radius:3px;'></div></div>"
+        +"</div>"
+        +"<div style='display:flex;align-items:center;gap:12px;'>"
+        +"<div style='font-size:20px;font-weight:500;color:#1a1a18;text-align:right;'>"+l.val+"</div>"
+        +"<span class='analise-badge "+l.badgeClass+"'>"+l.badge+"</span>"
+        +"</div>"
+        +"</div>";
+    }).join("");
+  })();
+
+  // ───────────── Projetos e UFs ─────────────
+  bars(document.getElementById("bProjeto"),Object.entries(count(rows,1)).sort(function(a,b){return b[1]-a[1];}),function(){return "#378ADD";},200);
+  bars(document.getElementById("bUF"),Object.entries(count(rows,7)).filter(function(e){return e[0]!=="N/A";}).sort(function(a,b){return b[1]-a[1];}).slice(0,10),function(){return "#85B7EB";},60);
+
+  // Objetos
+  bars(document.getElementById("bObj"),Object.entries(count(rows,6)).sort(function(a,b){return b[1]-a[1];}).slice(0,objTop===9999?99999:objTop),function(){return "#7F77DD";},200);
+}
+</script>
+</body>
+</html>
